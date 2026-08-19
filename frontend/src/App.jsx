@@ -6,7 +6,7 @@ import CameraScanner from './components/CameraScanner';
 import DiagnosticDrawer from './components/DiagnosticDrawer';
 import TelemetryModal from './components/TelemetryModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1/crop';
+const API_URL = import.meta.env.VITE_API_URL || 'https://agrikavach-crop-disease-ai-2.onrender.com/api/v1/crop';
 
 // Inject Google Fonts for the premium serif look
 const loadFonts = () => {
