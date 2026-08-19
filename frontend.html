@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AgriKavach - Edge AI Crop Diagnostics</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            oneui: {
+              bg: '#F2F4F8',
+              card: '#FFFFFF',
+              emerald: '#10B981',
+              blue: '#2563EB',
+              amber: '#F59E0B',
+              rose: '#E11D48'
+            }
+          },
+          borderRadius: {
+            '2xl': '1.25rem',
+            '3xl': '1.75rem',
+            '4xl': '2.25rem',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      background-color: #F2F4F8;
+      color: #1E293B;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .bottom-sheet-enter { transform: translateY(100%); }
+    .bottom-sheet-enter-active { transform: translateY(0); transition: transform 300ms cubic-bezier(0.175, 0.885, 0.32, 1); }
+    .bottom-sheet-exit { transform: translateY(0); }
+    .bottom-sheet-exit-active { transform: translateY(100%); transition: transform 300ms cubic-bezier(0.175, 0.885, 0.32, 1); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+    const API_URL = 'http://localhost:8000/api/v1/crop';
+
+    // SVG Icons
+    const Icon = ({ name, className }) => {
+      useEffect(() => { lucide.createIcons(); }, [name]);
+      return <i data-lucide={name} className={className}></i>;
+    };
+
+    function App() {
+      const [language, setLanguage] = useState('en');
+      const [selectedCrop, setSelectedCrop] = useState('TOMATO');
+      const [isLoading, setIsLoading] = useState(false);
+      const [diagnosticData, setDiagnosticData] = useState(null);
+      const [showDrawer, setShowDrawer] = useState(false);
+      const [showTelemetry, setShowTelemetry] = useState(false);
+      const [toast, setToast] = useState(null);
+      const fileRef = useRef(null);
+
+      const handleToast = (msg) => {
+        setToast(msg);
+        setTimeout(() => setToast(null), 4000);
+      };
+
+      const handleCapture = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setIsLoading(true);
+        const formData = new FormData();
+        formData.append('image_file', file);
+        formData.append('crop_species', selectedCrop);
+        formData.append('language_pref', language);
+
+        try {
+          const res = await fetch(`${API_URL}/diagnose`, {
+            method: 'POST',
+            body: formData
+          });
+          const json = await res.json();
+          if (!res.ok) {
+            handleToast(json.detail?.recommendation || json.detail?.error || 'Failed to process.');
+          } else {
+            setDiagnosticData(json.data);
+            setShowDrawer(true);
+          }
+        } catch (err) {
+          handleToast('Network error. Ensure backend is running.');
+        } finally {
+          setIsLoading(false);
+          e.target.value = '';
+        }
+      };
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen flex flex-col relative pb-6">
+          {toast && (
+            <div className="fixed top-6 left-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl text-xs font-bold flex justify-between items-center animate-bounce">
+              <span>{toast}</span>
+              <button onClick={() => setToast(null)}>✕</button>
+            </div>
+          )}
+
+          {/* Top Header */}
+          <header className="px-6 pt-8 pb-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold border border-emerald-200">
+                <Icon name="shield-check" className="w-3.5 h-3.5" /> Edge Engine Active
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowTelemetry(true)} className="p-2 bg-white rounded-full shadow-sm">
+                  <Icon name="activity" className="w-4 h-4 text-blue-600" />
+                </button>
+                <div className="flex bg-white rounded-full p-1 shadow-sm">
+                  <button onClick={() => setLanguage('en')} className={`px-2 py-0.5 text-xs font-bold rounded-full ${language === 'en' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}>EN</button>
+                  <button onClick={() => setLanguage('hi')} className={`px-2 py-0.5 text-xs font-bold rounded-full ${language === 'hi' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}>HI</button>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4">
+              <h1 className="text-3xl font-extrabold text-slate-900">AgriKavach</h1>
+              <p className="text-sm text-slate-500 font-medium">Field-Robust Crop Pathology AI</p>
+            </div>
+          </header>
+
+          {/* Crop Selector */}
+          <div className="px-6 py-2 overflow-x-auto no-scrollbar flex gap-3">
+            {['TOMATO', 'POTATO', 'CORN', 'WHEAT', 'RICE'].map(c => (
+              <button key={c} onClick={() => setSelectedCrop(c)} className={`px-4 py-2.5 rounded-2xl font-bold text-sm transition shadow-sm ${selectedCrop === c ? 'bg-slate-900 text-white scale-105' : 'bg-white text-slate-700'}`}>
+                {c.charAt(0) + c.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* Viewfinder */}
+          <div className="px-6 py-4 flex-1 flex flex-col justify-center">
+            <div className="w-full aspect-[4/5] bg-white rounded-4xl shadow-xl flex flex-col items-center justify-center relative overflow-hidden">
+              <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mb-4">
+                <Icon name="camera" className="w-10 h-10" />
+              </div>
+              <p className="font-bold text-slate-800">Scan Leaf Specimen</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-[200px] text-center">Position leaf in natural lighting. Avoid shake.</p>
+              
+              {isLoading && (
+                <div className="absolute inset-0 bg-slate-900/60 backdrop-blur flex flex-col items-center justify-center text-white">
+                  <div className="w-10 h-10 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mb-3"></div>
+                  <p className="text-sm font-bold">Neural Inference...</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              <button onClick={() => fileRef.current?.click()} className="flex justify-center items-center gap-2 py-4 bg-emerald-600 text-white font-bold rounded-3xl shadow-lg">
+                <Icon name="camera" className="w-5 h-5" /> Capture
+              </button>
+              <button onClick={() => fileRef.current?.click()} className="flex justify-center items-center gap-2 py-4 bg-white text-slate-700 font-bold rounded-3xl shadow-sm">
+                <Icon name="upload" className="w-5 h-5 text-slate-500" /> Upload
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" onChange={handleCapture} className="hidden" />
+            </div>
+          </div>
+
+          {/* Diagnostic Drawer */}
+          {showDrawer && diagnosticData && (
+            <div className="fixed inset-0 z-50 flex items-end">
+              <div className="absolute inset-0 bg-slate-900/40" onClick={() => setShowDrawer(false)}></div>
+              <div className="relative w-full max-h-[85vh] bg-white rounded-t-[2.5rem] p-6 overflow-y-auto bottom-sheet-enter-active">
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
+                <h2 className="text-2xl font-black">{diagnosticData.primaryDiagnosis.regionalName}</h2>
+                <p className="text-xs text-slate-500">{diagnosticData.primaryDiagnosis.diseaseCommonName}</p>
+                
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  <div className="bg-slate-50 p-3.5 rounded-2xl">
+                    <p className="text-xs text-slate-400 font-bold">CONFIDENCE</p>
+                    <p className="text-xl font-extrabold">{(diagnosticData.primaryDiagnosis.confidenceScore * 100).toFixed(1)}%</p>
+                  </div>
+                  <div className="bg-slate-50 p-3.5 rounded-2xl">
+                    <p className="text-xs text-slate-400 font-bold">SHARPNESS</p>
+                    <p className="text-xl font-extrabold text-emerald-600">{diagnosticData.qualityGate.sharpnessScore}</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                  <h3 className="font-bold text-sm mb-2 flex items-center gap-2"><Icon name="sprout" className="w-4 h-4 text-emerald-600"/> Organic Action</h3>
+                  <p className="text-xs text-slate-700">{diagnosticData.treatmentProtocol.immediateOrganicAction}</p>
+                  
+                  <h3 className="font-bold text-sm mt-4 mb-2 flex items-center gap-2"><Icon name="flask-conical" className="w-4 h-4 text-blue-600"/> Chemical Spray</h3>
+                  <p className="text-xs text-slate-700">{diagnosticData.treatmentProtocol.chemicalTreatment}</p>
+                </div>
+
+                <button onClick={() => setShowDrawer(false)} className="w-full mt-6 py-3 bg-slate-900 text-white rounded-2xl font-bold">Close</button>
+              </div>
+            </div>
+          )}
+
+          {/* Telemetry Modal */}
+          {showTelemetry && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/50" onClick={() => setShowTelemetry(false)}>
+              <div className="bg-white rounded-3xl w-full p-6" onClick={e => e.stopPropagation()}>
+                <h3 className="font-bold mb-4">Telemetry & Model Spec</h3>
+                <div className="space-y-3 text-xs">
+                  <div className="flex justify-between py-2 border-b"><span className="text-slate-500">Quantization</span><span className="font-bold text-emerald-600">PyTorch INT8</span></div>
+                  <div className="flex justify-between py-2 border-b"><span className="text-slate-500">Target Latency</span><span className="font-bold">&lt; 150ms</span></div>
+                  <div className="flex justify-between py-2 border-b"><span className="text-slate-500">Backbone</span><span className="font-bold">MobileNetV3</span></div>
+                </div>
+                <button onClick={() => setShowTelemetry(false)} className="w-full mt-6 py-2 bg-slate-100 rounded-xl font-bold">Close</button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
